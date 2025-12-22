@@ -14,6 +14,8 @@ sucesivas mediciones en el consultorio médico, la farmacia, etc.).*
 Imaginemos que queremos predecir lo que va a pasar mañana. 
 Para ello, primero buscaremos los "vecinos" que más se parezcan al día de hoy. Una vez localizados los vecinos, se coge la información de lo que ocurre al día siguiente de cada vecino. Y para finalizar, se hace una media aritmética de todos los días siguientes de los vecinos y esa sería nuestra predicción.
 
+El número de vecinos a buscar vendrá dado por un número K que nos pasará el usuario.
+
 ## Consideraciones
 Ahora mismo seguimos en grupos aleatorios, tendríamos que hablar con Pepe para solucionarlo.
 
