@@ -28,9 +28,9 @@ Desventajas:
 
 - En el caso de que los mejores vecinos estén en el mismo bloque, sólo seleccionaríamos a uno, potencialmente dejando a mejores candidatos atrás.
 
-### 2.2.-Usar un algoritmo de ordenación
+### 2.2.- Usar un algoritmo de ordenación
 
-Podríamos usar un algoritmo de ordenación que esté optimizado para entornos multihilo. De ésta forma, la ordenación sería distribuida y la búsqueda podría hacerse de forma secuancial seleccionando a los K mejores.
+Podríamos usar un algoritmo de ordenación que esté optimizado para entornos multihilo. De ésta forma, la ordenación sería distribuida y la búsqueda podría hacerse de forma secuencial seleccionando a los K mejores.
 
 Ventajas:
 
@@ -41,6 +41,26 @@ Desventajas:
 - Implementar el algoritmo de ordenación puede ser bastante difícil, ya que aunque ordenemos por bloques, habría que ordenar otra vez de forma global.
 - Si los días son muy cercanos entre sí, nuestro algoritmo estaría un poco "overfitted": sólo cogeriamos los mejores valores de un bloque.
 
+### 2.3- Dividir en K bloques y seleccionar los K mejores del bloque
+
+Podríamos hacer lo mismo que en el apartado 2.1 pero, en vez de dividir en K bloques y coger el mejor de cada uno, cogeríamos los K mejores.
+
+Más tarde recogeríamos esos K mejores de cada bloque en uno de los procesos y seleccionaríamos los K mejores de entre todos.
+
+Ventajas:
+
+- Sólo es ligeramente más difícil de implementar que el 2.1, y nos permite conseguir los mejores de todo el archivo.
+- No tenemos que meternos en faena con algoritmos de ordenación.
+
+Desventajas:
+
+- Lo mismo que la ventaja: un poco más complicado que el 2.1.
+- El 2.1 tenía la ventaja de comparar entre días más dispares a lo largo del tiempo, éste algoritmo no. Aunque eso tampoco tiene por qué ser una característica deseada.
+
 ## 3.- Hacer la media del día siguiente a los mejores
 
 Una vez tengamos a los vecinos seleccionados, tendríamos que hacer la media de los días posteriores a los vecinos, y usar el resultado como predicción.
+
+## 4.- Medir el tiempo de ejecución
+
+Se debe de generar un fichero de salida llamado _Tiempo.txt_, que deberá contener el tiempo de ejecución, así como otro archivo con las predicciones.
