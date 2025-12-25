@@ -2,19 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_LINE_LENGTH 65536 
+#define MAX_LINE_LENGTH 100000 
 
 // Función auxiliar para generar el nombre del archivo .bin 
-void generar_nombre_salida(const char *entrada, char *salida);
+void generarNombreSalida(const char *entrada, char *salida);
 
 // Función que se encarga de realizar el preprocesamiento a binario
-void procesar_archivo(const char *archivo_entrada);
+void procesarArchivo(const char *archivoEntrada);
 
+// MAIN
 int main(int argc, char *argv[]) {
-    // Procesamos todos los archivos pasado por línea de comandos
     if (argc > 1) {
         for (int i = 1; i < argc; i++) {
-            procesar_archivo(argv[i]);
+            procesarArchivo(argv[i]);
         }
     }else {
         perror("[ERROR] Inserte el nombre de al menos un archivo.\n");
@@ -24,82 +24,77 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-// -------- DESARROLLO DE LAS FUNCIONES --------
-
-void generar_nombre_salida(const char *entrada, char *salida) {
+// Desarrollo de las funciones
+void generarNombreSalida(const char *entrada, char *salida) {
     strcpy(salida, entrada);
     char *punto = strrchr(salida, '.'); // Busca el último punto del nombre
     if (punto != NULL) {
-        *punto = '\0'; // Cortamos en el punto (ejemplo: datos.txt --> datos )
+        *punto = '\0'; 
     }
-    strcat(salida, ".bin"); // Añadimos la nueva extensión (ejemplo: datos --> datos.bin)
+    strcat(salida, ".bin"); 
 }
 
-void procesar_archivo(const char *archivo_entrada) {
-    char archivo_salida[1024];
-    generar_nombre_salida(archivo_entrada, archivo_salida);
+void procesarArchivo(const char *archivoEntrada) {
+    char archivoSalida[1024];
+    generarNombreSalida(archivoEntrada, archivoSalida);
 
-    // Abrimos el archivo a procesar
-    FILE *f_in = fopen(archivo_entrada, "r");
-    if (!f_in) {
+    // Abrir el archivo a procesar
+    FILE *fEntrada = fopen(archivoEntrada, "r");
+    if (!fEntrada) {
         perror("[ERROR] No se pudo abrir el archivo de entrada");
         return;
     }
 
-    // Creamos el archivo binario de salida resultante en modo escritura
-    FILE *f_out = fopen(archivo_salida, "wb"); 
-    if (!f_out) {
+    // Crear el archivo binario resultante en modo escritura
+    FILE *fSalida = fopen(archivoSalida, "wb"); 
+    if (!fSalida) {
         perror("[ERROR] No se pudo crear el archivo de salida");
-        fclose(f_in);
+        fclose(fEntrada);
         return;
     }
 
-    int filas_totales = 0;
+    int filasTotales = 0;
     int columnas = 0;
     char buffer[MAX_LINE_LENGTH];
 
-    printf("--> Procesando: '%s'\n", archivo_entrada);
+    printf("--> Procesando: '%s'\n", archivoEntrada);
 
-    // 1) TRATAMIENTO DE LA CABECERA (Formato: "FILAS COLUMNAS" con espacio)
-    if (fscanf(f_in, "%d %d", &filas_totales, &columnas) != 2) {
+    if (fscanf(fEntrada, "%d %d", &filasTotales, &columnas) != 2) {
         fprintf(stderr, "[ERROR] Formato de cabecera incorrecto.\n");
-        fclose(f_in);
-        fclose(f_out);
+        fclose(fEntrada);
+        fclose(fSalida);
         return;
     }
 
-    // 2) ESCRIBIMOS EN BINARIO
-    // Escribimos N y K al principio para que el programa principal sepa cuánto leer
-    fwrite(&filas_totales, sizeof(int), 1, f_out);
-    fwrite(&columnas, sizeof(int), 1, f_out);
+    // Escribir en el archivo binario
+    fwrite(&filasTotales, sizeof(int), 1, fSalida);
+    fwrite(&columnas, sizeof(int), 1, fSalida);
 
-    // Consumimos el resto de la primera línea (salto de línea)
-    fgets(buffer, MAX_LINE_LENGTH, f_in);
+    fgets(buffer, MAX_LINE_LENGTH, fEntrada);
 
-    // 3. PROCESAMIENTO DE LOS DATOS (Formato: con comas)
-    double *fila_temp = (double*) malloc(columnas * sizeof(double));
+    // Procesar los datos separados por comas
+    double *filaTemp = (double*) malloc(columnas * sizeof(double));
     int contador_filas = 0;
 
-    while (fgets(buffer, MAX_LINE_LENGTH, f_in) != NULL) {
-        // Tratamos las líneas que no estén vacías
+    while (fgets(buffer, MAX_LINE_LENGTH, fEntrada) != NULL) {
+        // Tratar las líneas que no estén vacías
         if (strlen(buffer) >= 2){
-            char *token = strtok(buffer, ",\n\r"); // Separar por coma o salto de línea
+            char *token = strtok(buffer, ",\n\r"); 
             int col = 0;
             
             while (token != NULL && col < columnas) {
-                fila_temp[col] = atof(token); // Pasamos de ASCII a float
+                filaTemp[col] = atof(token); 
                 token = strtok(NULL, ",\n\r"); 
                 col++;
             }
 
-            // Si la línea tiene datos válidos, la escribimos en el binario
+            // Si la línea tiene datos válidos, se escriben en el archivo binario
             if (col > 0) {
-                // Si faltan columnas, rellenamos con 0 por seguridad
                 while (col < columnas) {
-                    fila_temp[col] = 0.0;
+                    filaTemp[col] = 0.0;
                     col++;
                 }
-                fwrite(fila_temp, sizeof(double), columnas, f_out);
+                fwrite(filaTemp, sizeof(double), columnas, fSalida);
                 contador_filas++;
             }
         }
@@ -107,9 +102,9 @@ void procesar_archivo(const char *archivo_entrada) {
     }
 
     printf("[OK] Generado: '%s' (%d filas, %d columnas)\n\n", 
-           archivo_salida, contador_filas, columnas);
+           archivoSalida, contador_filas, columnas);
 
-    free(fila_temp);
-    fclose(f_in);
-    fclose(f_out);
+    free(filaTemp);
+    fclose(fEntrada);
+    fclose(fSalida);
 }
