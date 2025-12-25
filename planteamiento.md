@@ -1,5 +1,19 @@
 # Trabajo
 
+## 0.- Preprocesado
+
+El primer problema con el que nos encontramos es que el archivo de datos viene en texto plano.
+
+El texto plano es un formato muy ineficiente a la hora de ser leído computacionalmente, ya que el tamaño de cada línea es variable, por lo que no podemos empezar a leer por una "línea" concreta (habría que contar previamente todos los `\n`).
+
+Por tanto, vemos importante aplicar un preprocesado al archivo, de forma que pasemos todos los números de formato texto a formato binario.
+
+Ésto hace que la primera ejecución sea más costosa, ya que habría que leer el archivo en texto, pasarlo a binario, y pasarlo por el algoritmo. Sin embargo, en las siguientes ejecuciones ya podríamos hacer uso del archivo binario, lo cuál haría que el algoritmo fuese mucho más rápido.
+
+También cabe destacar que, pese a que el archivo está en formato texto, todas las líneas excepto la primera miden lo mismo. Seguramente el profesor haya tenido todo lo expuesto en cuenta, y no nos haya querido sobrecargar de trabajo.
+
+De todas formas, en el mundo real siempre se hace preprocesado y se trata con valores binarios, por lo que no tendría sentido que no lo hiciésemos.
+
 ## 1.- Calcular los costes respecto al día actual
 
 Se debe de hacer un cálculo de los costes de todas las filas respecto al día actual (podemos contar como que es el último registrado o que podamos seleccionar un día pasado).
