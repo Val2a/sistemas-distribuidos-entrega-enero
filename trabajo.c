@@ -39,9 +39,6 @@ int main(int argc, char *argv[])
     k = atoi(argv[1]);
     dataPath = argv[2];
     numThreads = atoi(argv[3]);
-    printf("Datapath: %s\n", dataPath);
-
-    printf("[PID: %d]: k:%d\n", pid, k);
 
     omp_set_num_threads(numThreads);
 
@@ -72,7 +69,7 @@ int main(int argc, char *argv[])
 
     MPI_File_read_at_all(fh, offset, buffer, splitSize * cols, MPI_DOUBLE, 0);
 
-    printf("[PID: %d] Offset: %d, primer double: %0.2f\n", pid, offset, buffer[0]);
+    printf("[PID: %d] Offset: %d, primer double: %0.1f, ultimo double: %0.1f\n", pid, offset, buffer[0], buffer[splitSize * cols - 1]);
     free(buffer);
     MPI_Finalize();
     return 0;
