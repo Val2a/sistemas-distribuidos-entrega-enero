@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 
 #define MAX_LINE_LENGTH 100000 
 
@@ -74,7 +73,7 @@ void procesarArchivo(const char *archivoEntrada) {
     fgets(buffer, MAX_LINE_LENGTH, fEntrada);
 
     // Procesar los datos separados por comas
-    uint16_t *filaTemp = (uint16_t*) malloc(columnas * sizeof(uint16_t));
+    float *filaTemp = (float*) malloc(columnas * sizeof(float));
     int contador_filas = 0;
 
     while (fgets(buffer, MAX_LINE_LENGTH, fEntrada) != NULL) {
@@ -95,7 +94,7 @@ void procesarArchivo(const char *archivoEntrada) {
                     filaTemp[col] = 0.0;
                     col++;
                 }
-                fwrite(filaTemp, sizeof(uint16_t), columnas, fSalida);
+                fwrite(filaTemp, sizeof(float), columnas, fSalida);
                 contador_filas++;
             }
         }
