@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
     // con éstos que con las matrices, así que los usaremos.
     localMatrix = (float *)malloc(splitSize * cols * sizeof(float));
     localCosts = (float *)malloc(splitSize * sizeof(float));
+    currentDayData = (float *)malloc(cols * sizeof(float));
 
     MPI_File_read_at_all(fh, offset, localMatrix, splitSize * cols, MPI_FLOAT, 0);
     printf("[PID: %d] Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitSize * cols - 1]);
@@ -95,18 +96,34 @@ int main(int argc, char *argv[])
     // Mandamos los datos del día actual (el último)
     // al resto de procesos.
     // La ubicación de éste día puede variar:
-    // Si restSize == 0, la tiene el último proceso.
-    // Si restSize != 0, la tendrá el proceso 0
-
+    // Si restSize == 0, la tiene el último proceso en localMatrix
+    // Si restSize != 0, la tendrá el proceso 0 en restMatrix
     pidCurrentDayData = (restSize > 0) ? 0 : prn - 1;
-    if (pidCurrentDayData)
+    if (pid == pidCurrentDayData)
     {
-        currentDayData = (int *)malloc(cols * sizeof(float));
+        if (pid == 0)
+        {
+            for (int i = 0; i < cols; i++)
+            {
+                currentDayData[i] = restMatrix[(restSize - 1) * cols + i];
+            }
+        }
+        else
+        {
+            for (int i = 0; i < cols; i++)
+            {
+                currentDayData[i] = localMatrix[(splitSize - 1) * cols + i];
+            }
+        }
+        printf("[PID: %d] Día actual, linea: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, rows, currentDayData[0], currentDayData[cols - 1]);
     }
+
+    MPI_Bcast(currentDayData, cols, MPI_FLOAT, pidCurrentDayData, MPI_COMM_WORLD);
 
     // Liberamos la memoria asignada
     free(localMatrix);
     free(localCosts);
+    free(currentDayData);
     if (pid == 0 && restSize > 0)
     {
         free(restMatrix);
