@@ -27,8 +27,11 @@ int main(int argc, char *argv[])
     int rows, cols;
     // - Programa
     int splitSize, restSize;
+    // -- Datos del día más actual
+    float *todaysData;
     // -- Matrices de datos
     float *localMatrix;
+    float *restMatrix;
     // -- Arrays de costes
     float *costs;
     float *localCosts;
@@ -65,11 +68,8 @@ int main(int argc, char *argv[])
     MPI_Bcast(&rows, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
     MPI_Bcast(&cols, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
 
-    // Numero de lineas para cada proceso
     splitSize = rows / prn;
-    // Lineas restantes
     restSize = rows % prn;
-
     offset = 8 + pid * splitSize * cols * sizeof(float);
 
     // Realmente, ésto no es una matriz, si no un
@@ -80,6 +80,24 @@ int main(int argc, char *argv[])
 
     MPI_File_read_at_all(fh, offset, localMatrix, splitSize * cols, MPI_FLOAT, 0);
     printf("[PID: %d] Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitSize * cols - 1]);
+
+    if (pid == 0 && restSize > 0)
+    {
+        restMatrix = (float *)malloc(restSize * cols * sizeof(float));
+        offset = 8 + (rows - restSize) * cols * sizeof(float);
+        MPI_File_read_at(fh, offset, restMatrix, restSize * cols, MPI_FLOAT, 0);
+        printf("[PID: %d] RESTO: Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, restMatrix[0], restMatrix[restSize * cols - 1]);
+    }
+
+    // Mandamos los datos del día actual (el último)
+    // al resto de procesos.
+    // La ubicación de éste día puede variar:
+    // Si restSize == 0, la tiene el último proceso.
+    // Si restSize != 0, la tendrá el proceso 0
+    if (pid == prn - 1)
+    {
+        /* code */
+    }
 
     free(localMatrix);
     MPI_Finalize();
