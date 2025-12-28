@@ -6,6 +6,7 @@
 *.ko
 *.obj
 *.elf
+*.bin
 
 # Binary files
 *.bin
