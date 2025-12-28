@@ -4,37 +4,44 @@
 #include <mpi.h>
 #include <string.h>
 
+/**
+ * Comprobamos que los argumentos
+ * sean correctos.
+ *
+ * En caso contrario, finaliza el programa.
+ */
+int checkArguments(int pid, int argc);
+
 int main(int argc, char *argv[])
 {
     // Variables
-    // 1. Argumentos
+    // - Argumentos
     int k;
     char *dataPath;
     int numThreads;
-    // 2. MPI
+    // - MPI
     int pid, prn;
-    // 3. Archivo
+    // - Archivo
     MPI_Offset offset;
     MPI_File fh;
     int rows, cols;
-    // 4. Programa
+    // - Programa
     int splitSize, restSize;
-    float *matrix;
-    float *buffer;
+    // -- Matrices de datos
+    float *localMatrix;
+    // -- Arrays de costes
+    float *costs;
+    float *localCosts;
+    // -- Arrays de mejores vecinos (index)
+    int *bests;
+    int *localBests;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &pid);
     MPI_Comm_size(MPI_COMM_WORLD, &prn);
 
-    if (argc < 3)
-    {
-        if (pid == 0)
-        {
-            printf("Error: Los argumentos son: -np <Num. procesos> nombrePrograma <Num. K de vecinos> <Ruta a datos> <Num. hilos>\n");
-        }
-        MPI_Finalize();
-        return 0;
-    }
+    // Control de argumentos
+    checkArguments(pid, argc);
 
     k = atoi(argv[1]);
     dataPath = argv[2];
@@ -65,12 +72,29 @@ int main(int argc, char *argv[])
 
     offset = 8 + pid * splitSize * cols * sizeof(float);
 
-    buffer = (float *)malloc(splitSize * cols * sizeof(float));
+    // Realmente, ésto no es una matriz, si no un
+    // vector unidimensional. MPI se lleva mejor
+    // con éstos que con las matrices, así que los usaremos.
+    localMatrix = (float *)malloc(splitSize * cols * sizeof(float));
+    localCosts = (float *)malloc(splitSize * sizeof(float));
 
-    MPI_File_read_at_all(fh, offset, buffer, splitSize * cols, MPI_FLOAT, 0);
+    MPI_File_read_at_all(fh, offset, localMatrix, splitSize * cols, MPI_FLOAT, 0);
+    printf("[PID: %d] Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitSize * cols - 1]);
 
-    printf("[PID: %d] Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, buffer[0], buffer[splitSize * cols - 1]);
-    free(buffer);
+    free(localMatrix);
     MPI_Finalize();
     return 0;
+}
+
+int checkArguments(int pid, int argc)
+{
+    if (argc < 3)
+    {
+        if (pid == 0)
+        {
+            printf("Error: Los argumentos son: -np <Num. procesos> nombrePrograma <Num. K de vecinos> <Ruta a datos> <Num. hilos>\n");
+        }
+        MPI_Finalize();
+        return 0;
+    }
 }
