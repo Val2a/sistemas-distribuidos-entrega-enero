@@ -28,7 +28,10 @@ int main(int argc, char *argv[])
     // - Programa
     int splitSize, restSize;
     // -- Datos del día más actual
-    float *todaysData;
+    float *currentDayData;
+    // -- PID que ha leido el trozo
+    //    con el dia actual
+    int pidCurrentDayData;
     // -- Matrices de datos
     float *localMatrix;
     float *restMatrix;
@@ -94,12 +97,21 @@ int main(int argc, char *argv[])
     // La ubicación de éste día puede variar:
     // Si restSize == 0, la tiene el último proceso.
     // Si restSize != 0, la tendrá el proceso 0
-    if (pid == prn - 1)
+
+    pidCurrentDayData = (restSize > 0) ? 0 : prn - 1;
+    if (pidCurrentDayData)
     {
-        /* code */
+        currentDayData = (int *)malloc(cols * sizeof(float));
     }
 
+    // Liberamos la memoria asignada
     free(localMatrix);
+    free(localCosts);
+    if (pid == 0 && restSize > 0)
+    {
+        free(restMatrix);
+    }
+
     MPI_Finalize();
     return 0;
 }
