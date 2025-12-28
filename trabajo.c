@@ -19,8 +19,8 @@ int main(int argc, char *argv[])
     int rows, cols;
     // 4. Programa
     int splitSize, restSize;
-    double *matrix;
-    double *buffer;
+    float *matrix;
+    float *buffer;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &pid);
@@ -63,13 +63,13 @@ int main(int argc, char *argv[])
     // Lineas restantes
     restSize = rows % prn;
 
-    offset = 8 + pid * splitSize * cols * sizeof(double);
+    offset = 8 + pid * splitSize * cols * sizeof(float);
 
-    buffer = (double *)malloc(splitSize * cols * sizeof(double));
+    buffer = (float *)malloc(splitSize * cols * sizeof(float));
 
-    MPI_File_read_at_all(fh, offset, buffer, splitSize * cols, MPI_DOUBLE, 0);
+    MPI_File_read_at_all(fh, offset, buffer, splitSize * cols, MPI_FLOAT, 0);
 
-    printf("[PID: %d] Offset: %d, primer double: %0.1f, ultimo double: %0.1f\n", pid, offset, buffer[0], buffer[splitSize * cols - 1]);
+    printf("[PID: %d] Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, buffer[0], buffer[splitSize * cols - 1]);
     free(buffer);
     MPI_Finalize();
     return 0;
