@@ -38,14 +38,17 @@ int main(int argc, char *argv[])
     // - Programa
     int splitRows, restRows;
     // -- Datos del día más actual
+
     // --- Línea objetivo (la que se pretende predecir)
-    float *targetRow;
-    // --- PID que contiene la targetRow
-    int targetRowPID;
+    int targetRow;
+    // --- Datos de la línea objetivo
+    float *targetRowData;
+
     // --- Línea de referencia (la que se usará para buscar vecinos)
-    float *referenceRow;
-    // --- PID que contiene la referenceRow
-    int referenceRowPID;
+    int referenceRow;
+    // --- Datos de la línea de referencia
+    float *referenceRowData;
+
     // -- Matrices de datos
     float *localMatrix;
     float *restMatrix;
@@ -112,7 +115,7 @@ int main(int argc, char *argv[])
     // con éstos que con las matrices, así que los usaremos.
     localMatrix = (float *)malloc(splitRows * cols * sizeof(float));
     localCosts = (float *)malloc(splitRows * sizeof(float));
-    targetRow = (float *)malloc(cols * sizeof(float));
+    targetRowData = (float *)malloc(cols * sizeof(float));
 
     MPI_File_read_at_all(fh, offset, localMatrix, splitRows * cols, MPI_FLOAT, 0);
     printf("[PID: %d] Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitRows * cols - 1]);
@@ -126,8 +129,8 @@ int main(int argc, char *argv[])
     }
 
     // Tenemos que realizar las N_PREDICTIONS predicciones.
-    // Para ello, debemos recoger la línea actual (referenceRow)
-    // y la línea siguiente (targetRow, que es la que queremos predecir)
+    // Para ello, debemos recoger la línea actual (referenceRowData)
+    // y la línea siguiente (targetRowData, que es la que queremos predecir)
     //
     // Empezamos a contar desde la última, por lo que i sería
     // la línea a predecir e i+1 sería la línea que vamos a usar
@@ -135,36 +138,30 @@ int main(int argc, char *argv[])
     for (int i = 0; i < N_PREDICTIONS; i++)
     {
         int rowToSearch = rows - i;
-        // Comprobamos si la targetRow está en
-        // las líneas de split o resto
-        if (restRows == 0 || rowToSearch < (rows - restRows))
-        {
-            // Si está en split, calculamos que proceso tiene la línea.
-            int pidWithTheRow = -1;
-            for (int j = prn - 1; j <= 0; j--)
-            {
-                int firstRowInPid = j * splitRows + 1;  // El PID 0 tendrá como primera la row 1: 0 * splitRows + 1;
-                int lastRowInPid = (j + 1) * splitRows; // Si splitRows = 300, el PID 0 tendrá como última la 300 = (0+1) * 300
 
-                if (rowToSearch >= firstRowInPid && rowToSearch <= lastRowInPid)
-                {
-                    pidWithTheRow = j;
-                }
+        int pidWithTheRow = rowToSearch / splitRows;
+        int rowToSearchIndex = rowToSearch % splitRows;
+
+        int isInRestRow = 0;
+
+        // El pid no puede ser igual ni mayor que prn.
+        // Si se da aquí el caso, significa que la línea
+        // a buscar está en las lineas de resto.
+        if (pidWithTheRow == prn)
+        {
+            pidWithTheRow = 0;
+            isInRestRow = 1;
+        }
+
+        if (pidWithTheRow == pid)
+        {
+            for (int j = 0; j < cols; j++)
+            {
+                targetRowData[j] = localMatrix[rowToSearchIndex * cols + j];
             }
         }
-        else
-        {
-            // En cuyo caso habrá que consultar al proceso maestro
-            if (pid == 0)
-            {
-                for (int j = 0; j < cols; j++)
-                {
-                    targetRow[j] = restMatrix[(restRows - i) * cols + j];
-                }
-            }
 
-            MPI_Bcast(targetRow, cols, MPI_FLOAT, 0, MPI_COMM_WORLD);
-        }
+        MPI_Bcast(targetRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
     }
 
     // Liberamos la memoria asignada
@@ -172,8 +169,8 @@ int main(int argc, char *argv[])
 
     free(localMatrix);
     free(localCosts);
-    free(targetRow);
-    free(referenceRow);
+    free(targetRowData);
+    free(referenceRowData);
     if (pid == 0 && restRows > 0)
     {
         free(restMatrix);
@@ -205,4 +202,28 @@ float calculateMAPE(float *vPredict, float *vReal, int size)
     }
 
     return (sum * 100.0f) / (float)size;
+}
+
+void searchRow(int pid, int prn, int rowToSearch, int splitRows, int cols, float *localM, float *restM, float *rowBuffer)
+{
+    int pidWithTheRow = rowToSearch / splitRows;
+    int rowToSearchIndex = rowToSearch % splitRows;
+    float *m = localM;
+
+    // El pid no puede ser igual ni mayor que prn.
+    // Si se da aquí el caso, significa que la línea
+    // a buscar está en las lineas de resto.
+    if (pidWithTheRow == prn)
+    {
+        pidWithTheRow = 0;
+        m = restM;
+    }
+
+    if (pidWithTheRow == pid)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            rowBuffer[j] = m[rowToSearchIndex * cols + j];
+        }
+    }
 }
