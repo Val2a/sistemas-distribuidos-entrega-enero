@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <mpi.h>
 #include <string.h>
+#include <math.h>
+
+#define FILENAME_BUFFER 50
+#define N_PREDICTIONS 1000
 
 /**
  * Comprobamos que los argumentos
@@ -11,6 +15,12 @@
  * En caso contrario, finaliza el programa.
  */
 int checkArguments(int pid, int argc);
+
+/**
+ * Calcula el mape de un vector predicho respecto
+ * a otro vector "real".
+ */
+float calculateMAPE(float *vPredict, float *vReal, int size);
 
 int main(int argc, char *argv[])
 {
@@ -28,7 +38,10 @@ int main(int argc, char *argv[])
     // - Programa
     int splitRows, restRows;
     // -- Datos del día más actual
-    float *currentDayData;
+    // --- Línea objetivo (la que se pretende predecir)
+    float *targetRow;
+    // --- Línea de referencia (la que se usará para buscar vecinos)
+    float *referenceRow;
     // -- PID que ha leido el trozo
     //    con el dia actual
     int pidCurrentDayData;
@@ -41,6 +54,13 @@ int main(int argc, char *argv[])
     // -- Arrays de mejores vecinos (index)
     int *bests;
     int *localBests;
+    // -- Archivos de salida
+    char outputFolder[] = "output/";
+    char prediccionesFileName[] = "Predicciones.txt";
+    char mapeFileName[] = "MAPE.txt";
+    char tiempoFileName[] = "Tiempo.txt";
+    // --- Variable auxiliar
+    char fileName[FILENAME_BUFFER];
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &pid);
@@ -80,7 +100,7 @@ int main(int argc, char *argv[])
     // con éstos que con las matrices, así que los usaremos.
     localMatrix = (float *)malloc(splitRows * cols * sizeof(float));
     localCosts = (float *)malloc(splitRows * sizeof(float));
-    currentDayData = (float *)malloc(cols * sizeof(float));
+    targetRow = (float *)malloc(cols * sizeof(float));
 
     MPI_File_read_at_all(fh, offset, localMatrix, splitRows * cols, MPI_FLOAT, 0);
     printf("[PID: %d] Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitRows * cols - 1]);
@@ -93,11 +113,46 @@ int main(int argc, char *argv[])
         printf("[PID: %d] RESTO: Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, restMatrix[0], restMatrix[restRows * cols - 1]);
     }
 
+    // Tenemos que realizar las N_PREDICTIONS predicciones.
+    // Para ello, debemos recoger la línea actual (referenceRow)
+    // y la línea siguiente (targetRow, que es la que queremos predecir)
+    //
+    // Empezamos a contar desde la última, por lo que i sería
+    // la línea a predecir e i+1 sería la línea que vamos a usar
+    // para encontrar los vecinos y predecir i.
+    for (int i = 1; i <= N_PREDICTIONS; i++)
+    {
+        // Comprobamos si la targetRow está en
+        // las líneas de resto
+        if (restRows > i)
+        {
+            // En cuyo caso habrá que consultar al proceso maestro
+            if (pid == 0)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    targetRow[j] = restMatrix[(restRows - i) * cols + j];
+                }
+            }
+
+            MPI_Bcast(targetRow, cols, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        }
+        else
+        {
+            // Si no es el caso, calculamos que proceso tiene la línea.
+            for (int j = prn - 1; j <= 0; j--)
+            {
+                /* code */
+            }
+        }
+    }
+
     // Mandamos los datos del día actual (el último)
     // al resto de procesos.
     // La ubicación de éste día puede variar:
     // Si restRows == 0, la tiene el último proceso en localMatrix
     // Si restRows != 0, la tendrá el proceso 0 en restMatrix
+    /*
     pidCurrentDayData = (restRows > 0) ? 0 : prn - 1;
     if (pid == pidCurrentDayData)
     {
@@ -116,18 +171,20 @@ int main(int argc, char *argv[])
 
         for (int i = 0; i < cols; i++)
         {
-            currentDayData[i] = matrix[(size - 1) * cols + i];
+            targetRow[i] = matrix[(size - 1) * cols + i];
         }
 
-        printf("[PID: %d] Día actual, linea: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, rows, currentDayData[0], currentDayData[cols - 1]);
+        printf("[PID: %d] Día actual, linea: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, rows, targetRow[0], targetRow[cols - 1]);
     }
+    */
 
-    MPI_Bcast(currentDayData, cols, MPI_FLOAT, pidCurrentDayData, MPI_COMM_WORLD);
+    MPI_Bcast(targetRow, cols, MPI_FLOAT, pidCurrentDayData, MPI_COMM_WORLD);
 
-        // Liberamos la memoria asignada
+    // Liberamos la memoria asignada
     free(localMatrix);
     free(localCosts);
-    free(currentDayData);
+    free(targetRow);
+    free(referenceRow);
     if (pid == 0 && restRows > 0)
     {
         free(restMatrix);
@@ -148,4 +205,15 @@ int checkArguments(int pid, int argc)
         MPI_Finalize();
         return 0;
     }
+}
+
+float calculateMAPE(float *vPredict, float *vReal, int size)
+{
+    float sum = 0.0;
+    for (int i = 0; i < size; i++)
+    {
+        sum += fabsf(vReal[i] - vPredict[i]) / fabsf(vReal[i]);
+    }
+
+    return (sum * 100.0f) / (float)size;
 }
