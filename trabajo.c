@@ -40,11 +40,12 @@ int main(int argc, char *argv[])
     // -- Datos del día más actual
     // --- Línea objetivo (la que se pretende predecir)
     float *targetRow;
+    // --- PID que contiene la targetRow
+    int targetRowPID;
     // --- Línea de referencia (la que se usará para buscar vecinos)
     float *referenceRow;
-    // -- PID que ha leido el trozo
-    //    con el dia actual
-    int pidCurrentDayData;
+    // --- PID que contiene la referenceRow
+    int referenceRowPID;
     // -- Matrices de datos
     float *localMatrix;
     float *restMatrix;
@@ -91,6 +92,17 @@ int main(int argc, char *argv[])
     MPI_Bcast(&rows, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
     MPI_Bcast(&cols, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
 
+    if (N_PREDICTIONS + 1 > rows)
+    {
+        if (pid == 0)
+        {
+            printf("Error: El número de predicciones debe de ser menor que el número de filas del archivo.\n");
+            MPI_File_close(&fh);
+            MPI_Finalize();
+            return 0;
+        }
+    }
+
     splitRows = rows / prn;
     restRows = rows % prn;
     offset = 8 + pid * splitRows * cols * sizeof(float);
@@ -120,11 +132,27 @@ int main(int argc, char *argv[])
     // Empezamos a contar desde la última, por lo que i sería
     // la línea a predecir e i+1 sería la línea que vamos a usar
     // para encontrar los vecinos y predecir i.
-    for (int i = 1; i <= N_PREDICTIONS; i++)
+    for (int i = 0; i < N_PREDICTIONS; i++)
     {
+        int rowToSearch = rows - i;
         // Comprobamos si la targetRow está en
-        // las líneas de resto
-        if (restRows > i)
+        // las líneas de split o resto
+        if (restRows == 0 || rowToSearch < (rows - restRows))
+        {
+            // Si está en split, calculamos que proceso tiene la línea.
+            int pidWithTheRow = -1;
+            for (int j = prn - 1; j <= 0; j--)
+            {
+                int firstRowInPid = j * splitRows + 1;  // El PID 0 tendrá como primera la row 1: 0 * splitRows + 1;
+                int lastRowInPid = (j + 1) * splitRows; // Si splitRows = 300, el PID 0 tendrá como última la 300 = (0+1) * 300
+
+                if (rowToSearch >= firstRowInPid && rowToSearch <= lastRowInPid)
+                {
+                    pidWithTheRow = j;
+                }
+            }
+        }
+        else
         {
             // En cuyo caso habrá que consultar al proceso maestro
             if (pid == 0)
@@ -137,50 +165,11 @@ int main(int argc, char *argv[])
 
             MPI_Bcast(targetRow, cols, MPI_FLOAT, 0, MPI_COMM_WORLD);
         }
-        else
-        {
-            // Si no es el caso, calculamos que proceso tiene la línea.
-            for (int j = prn - 1; j <= 0; j--)
-            {
-                /* code */
-            }
-        }
     }
-
-    // Mandamos los datos del día actual (el último)
-    // al resto de procesos.
-    // La ubicación de éste día puede variar:
-    // Si restRows == 0, la tiene el último proceso en localMatrix
-    // Si restRows != 0, la tendrá el proceso 0 en restMatrix
-    /*
-    pidCurrentDayData = (restRows > 0) ? 0 : prn - 1;
-    if (pid == pidCurrentDayData)
-    {
-        float *matrix;
-        int size;
-        if (pid == 0)
-        {
-            matrix = restMatrix;
-            size = restRows;
-        }
-        else
-        {
-            matrix = localMatrix;
-            size = splitRows;
-        }
-
-        for (int i = 0; i < cols; i++)
-        {
-            targetRow[i] = matrix[(size - 1) * cols + i];
-        }
-
-        printf("[PID: %d] Día actual, linea: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, rows, targetRow[0], targetRow[cols - 1]);
-    }
-    */
-
-    MPI_Bcast(targetRow, cols, MPI_FLOAT, pidCurrentDayData, MPI_COMM_WORLD);
 
     // Liberamos la memoria asignada
+    MPI_File_close(&fh);
+
     free(localMatrix);
     free(localCosts);
     free(targetRow);
