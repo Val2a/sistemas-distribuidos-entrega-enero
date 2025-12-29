@@ -140,36 +140,16 @@ int main(int argc, char *argv[])
     // Empezamos a contar desde la última, por lo que i sería
     // la línea a predecir e i+1 sería la línea que vamos a usar
     // para encontrar los vecinos y predecir i.
-    for (int i = 0; i < N_PREDICTIONS; i++)
+    for (int i = 1; i <= N_PREDICTIONS; i++)
     {
+        int pidWithTheRow = -1;
         int rowToSearch = rows - i;
 
-        int pidWithTheRow = rowToSearch / splitRows;
-        int rowToSearchIndex = rowToSearch % splitRows;
-
-        int isInRestRow = 0;
-
-        // El pid no puede ser igual ni mayor que prn.
-        // Si se da aquí el caso, significa que la línea
-        // a buscar está en las lineas de resto.
-        if (pidWithTheRow == prn)
-        {
-            pidWithTheRow = 0;
-            isInRestRow = 1;
-        }
-
-        if (pidWithTheRow == pid)
-        {
-            for (int j = 0; j < cols; j++)
-            {
-                targetRowData[j] = localMatrix[rowToSearchIndex * cols + j];
-            }
-        }
         searchRow(pid, prn, rowToSearch, splitRows, cols, localMatrix, restMatrix, targetRowData, &pidWithTheRow);
 
         if (pidWithTheRow == pid)
         {
-            printf("[PID: %d] Linea encontrada: Primer float: %0.1f, ultimo float: %0.1f\n", pid, targetRowData[0], targetRowData[cols - 1]);
+            printf("[PID: %d] Linea %d: Primer float: %0.1f, ultimo float: %0.1f\n", pid, rowToSearch + 1, targetRowData[0], targetRowData[cols - 1]);
         }
 
         // MPI_Bcast(targetRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
@@ -217,20 +197,20 @@ float calculateMAPE(float *vPredict, float *vReal, int size)
 
 void searchRow(int pid, int prn, int wantedRow, int splitRows, int cols, float *localM, float *restM, float *rowDataBuffer, int *pidBuffer)
 {
-    pidBuffer = wantedRow / splitRows;
+    *pidBuffer = wantedRow / splitRows;
     int rowToSearchIndex = wantedRow % splitRows;
     float *m = localM;
 
     // El pid no puede ser igual ni mayor que prn.
     // Si se da aquí el caso, significa que la línea
     // a buscar está en las lineas de resto.
-    if (pidBuffer == prn)
+    if (*pidBuffer == prn)
     {
-        pidBuffer = 0;
+        *pidBuffer = 0;
         m = restM;
     }
 
-    if (pidBuffer == pid)
+    if (*pidBuffer == pid)
     {
         for (int j = 0; j < cols; j++)
         {
