@@ -129,14 +129,14 @@ int main(int argc, char *argv[])
     targetRowData = (float *)malloc(cols * sizeof(float));
 
     MPI_File_read_at_all(fh, offset, localMatrix, splitRows * cols, MPI_FLOAT, 0);
-    printf("[PID: %d] Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitRows * cols - 1]);
+    printf("[PID: %d] Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitRows * cols - 1]);
 
     if (pid == 0 && restRows > 0)
     {
         restMatrix = (float *)malloc(restRows * cols * sizeof(float));
         offset = 8 + (rows - restRows) * cols * sizeof(float);
         MPI_File_read_at(fh, offset, restMatrix, restRows * cols, MPI_FLOAT, 0);
-        printf("[PID: %d] RESTO: Offset: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, restMatrix[0], restMatrix[restRows * cols - 1]);
+        printf("[PID: %d] RESTO: Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, restMatrix[0], restMatrix[restRows * cols - 1]);
     }
 
     // Tenemos que realizar las N_PREDICTIONS predicciones.
