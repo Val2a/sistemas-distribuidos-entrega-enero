@@ -23,9 +23,9 @@ int checkArguments(int pid, int argc);
 float calculateMAPE(float *vPredict, float *vReal, int size);
 
 /**
- * Busca una línea (wantedRow) y la guarda en *rowDataBuffer, en
+ * Busca una línea (wantedRowIndex) y la guarda en *rowDataBuffer, en
  */
-void searchRow(int pid, int prn, int wantedRow, int splitRows, int cols, float *localM, float *restM, float *rowDataBuffer, int *pidBuffer);
+void searchRow(int pid, int prn, int wantedRowIndex, int splitRows, int cols, float *localM, float *restM, float *rowDataBuffer, int *pidBuffer);
 
 /**
  * Distancia euclidea entre dos vectores
@@ -207,10 +207,10 @@ float calculateMAPE(float *vPredict, float *vReal, int size)
     return (sum * 100.0f) / (float)size;
 }
 
-void searchRow(int pid, int prn, int wantedRow, int splitRows, int cols, float *localM, float *restM, float *rowDataBuffer, int *pidBuffer)
+void searchRow(int pid, int prn, int wantedRowIndex, int splitRows, int cols, float *localM, float *restM, float *rowDataBuffer, int *pidBuffer)
 {
-    *pidBuffer = wantedRow / splitRows;
-    int rowToSearchIndex = wantedRow % splitRows;
+    *pidBuffer = wantedRowIndex / splitRows;
+    int rowToSearchIndex = wantedRowIndex % splitRows;
     float *m = localM;
 
     // El pid no puede ser igual ni mayor que prn.
