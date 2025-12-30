@@ -125,6 +125,7 @@ int main(int argc, char *argv[])
     // con éstos que con las matrices, así que los usaremos.
     localMatrix = (float *)malloc(splitRows * cols * sizeof(float));
     localCosts = (float *)malloc(splitRows * sizeof(float));
+    referenceRowData = (float *)malloc(cols * sizeof(float));
     targetRowData = (float *)malloc(cols * sizeof(float));
 
     MPI_File_read_at_all(fh, offset, localMatrix, splitRows * cols, MPI_FLOAT, 0);
@@ -148,17 +149,22 @@ int main(int argc, char *argv[])
     for (int i = 1; i <= N_PREDICTIONS; i++)
     {
         int pidWithTheRow = -1; // Será sobreescrito
-        int rowToSearch = rows - i;
+        int referenceRowIndex = rows - i - 1;
+        // int targetRowIndex = rows - i;
 
-        searchRow(pid, prn, rowToSearch, splitRows, cols, localMatrix, restMatrix,
-                  targetRowData, &pidWithTheRow); // Output
+        searchRow(pid, prn, referenceRowIndex, splitRows, cols, localMatrix, restMatrix,
+                  referenceRowData, &pidWithTheRow); // Output
 
-        MPI_Bcast(targetRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
-
-#pragma omp parallel for
-        for (int i = 0; i < splitRows; i++)
+        // TODO Borrar, es código de prueba
+        if (pidWithTheRow == pid)
         {
+            if (i % 10 == 0)
+            {
+                printf("[PID: %d] Linea referencia: Index: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, referenceRowIndex, referenceRowData[0], referenceRowData[cols - 1]);
+            }
         }
+
+        // MPI_Bcast(targetRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
     }
 
     // Liberamos la memoria asignada
