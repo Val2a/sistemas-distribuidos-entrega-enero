@@ -27,6 +27,11 @@ float calculateMAPE(float *vPredict, float *vReal, int size);
  */
 void searchRow(int pid, int prn, int wantedRow, int splitRows, int cols, float *localM, float *restM, float *rowDataBuffer, int *pidBuffer);
 
+/**
+ * Distancia euclidea entre dos vectores
+ */
+float euclideanDistance(float *v1, float *v2, int size);
+
 int main(int argc, char *argv[])
 {
     // Variables
@@ -142,17 +147,18 @@ int main(int argc, char *argv[])
     // para encontrar los vecinos y predecir i.
     for (int i = 1; i <= N_PREDICTIONS; i++)
     {
-        int pidWithTheRow = -1;
+        int pidWithTheRow = -1; // Será sobreescrito
         int rowToSearch = rows - i;
 
-        searchRow(pid, prn, rowToSearch, splitRows, cols, localMatrix, restMatrix, targetRowData, &pidWithTheRow);
+        searchRow(pid, prn, rowToSearch, splitRows, cols, localMatrix, restMatrix,
+                  targetRowData, &pidWithTheRow); // Output
 
-        if (pidWithTheRow == pid)
+        MPI_Bcast(targetRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
+
+#pragma omp parallel for
+        for (int i = 0; i < splitRows; i++)
         {
-            printf("[PID: %d] Linea %d: Primer float: %0.1f, ultimo float: %0.1f\n", pid, rowToSearch + 1, targetRowData[0], targetRowData[cols - 1]);
         }
-
-        // MPI_Bcast(targetRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
     }
 
     // Liberamos la memoria asignada
@@ -217,4 +223,16 @@ void searchRow(int pid, int prn, int wantedRow, int splitRows, int cols, float *
             rowDataBuffer[j] = m[rowToSearchIndex * cols + j];
         }
     }
+}
+
+float euclideanDistance(float *v1, float *v2, int size)
+{
+
+    float d = 0.0f;
+    for (size_t i = 0; i < size; i++)
+    {
+        d += powf(v1[i] - v2[i], 2);
+    }
+
+    return sqrtf(d);
 }
