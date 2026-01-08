@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
     targetRowData = (float *)malloc(cols * sizeof(float));
 
     MPI_File_read_at_all(fh, offset, localMatrix, splitRows * cols, MPI_FLOAT, 0);
-    printf("[PID: %d] Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitRows * cols - 1]);
+    printf("[PID: %d] [SPLIT] Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitRows * cols - 1]);
 
     if (pid == 0)
     {
@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
             restMatrix = (float *)malloc(restRows * cols * sizeof(float));
             offset = 8 + (rows - restRows) * cols * sizeof(float);
             MPI_File_read_at(fh, offset, restMatrix, restRows * cols, MPI_FLOAT, 0);
-            printf("[PID: %d] RESTO: Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, restMatrix[0], restMatrix[restRows * cols - 1]);
+            printf("[PID: %d] [RESTO] Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, restMatrix[0], restMatrix[restRows * cols - 1]);
         }
     }
 
@@ -166,17 +166,6 @@ int main(int argc, char *argv[])
 
         searchRow(pid, prn, referenceRowIndex, splitRows, cols, localMatrix, restMatrix,
                   referenceRowData, &pidWithTheRow); // Output
-
-        // TODO Borrar, es código de prueba
-        if (pidWithTheRow == pid)
-        {
-            if (i % 10 == 0)
-            {
-                printf("[PID: %d] Linea referencia: Index: %d, primer float: %0.1f, ultimo float: %0.1f\n", pid, referenceRowIndex, referenceRowData[0], referenceRowData[cols - 1]);
-            }
-        }
-
-        // MPI_Bcast(targetRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
 
         // Bcast para realizar la distancia euclídea de cada fila local contra la de referencia
         MPI_Bcast(referenceRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
@@ -327,7 +316,6 @@ int main(int argc, char *argv[])
         fprintf(fTiempo, "Configuración    : %d procesos, %d hilos\n", prn, numThreads);
 
         // Liberamos memoria
-
         fclose(fPred);
         fclose(fMape);
         fclose(fTiempo);
@@ -422,7 +410,6 @@ void searchRow(int pid, int prn, int wantedRowIndex, int splitRows, int cols, fl
 
 float euclideanDistance(float *v1, float *v2, int size)
 {
-
     float d = 0.0f;
 
     // Paralelizar éste for ha resultado en una ejecución casi 10 veces más lenta,
