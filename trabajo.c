@@ -322,9 +322,9 @@ int main(int argc, char *argv[])
         // Generamos Tiempo.txt
         fTiempo = fopen("Tiempo.txt", "w");
         fprintf(fTiempo, "Fichero procesado: %s\n", dataPath);
-        fprintf(fTiempo, "Tiempo total: %.4f segundos\n", t_fin - t_inicio);
-        fprintf(fTiempo, "MAPE global: %.4f%%\n", sumaMAPE / N_PREDICTIONS);
-        fprintf(fTiempo, "Configuración: %d procesos, %d hilos\n", prn, numThreads);
+        fprintf(fTiempo, "Tiempo total     : %.4f segundos\n", t_fin - t_inicio);
+        fprintf(fTiempo, "MAPE global      : %.4f%%\n", sumaMAPE / N_PREDICTIONS);
+        fprintf(fTiempo, "Configuración    : %d procesos, %d hilos\n", prn, numThreads);
 
         // Liberamos memoria
 
@@ -372,7 +372,7 @@ float calculateMAPE(float *vPredict, float *vReal, int size)
     float sum = 0.0;
     int count = 0;
 
-#pragma omp parrallel for reduction(+ : sum) reduction(+ : count) // Falta comprobar que no empeore el resultado
+    // Éste for, paralelizado, empeora los tiempos de ejecución.
     for (int i = 0; i < size; i++)
     {
         // Solo calculamos si el valor real no es cero para evitar inf/nan
@@ -411,7 +411,8 @@ void searchRow(int pid, int prn, int wantedRowIndex, int splitRows, int cols, fl
     // El proceso que tiene los datos los copia al buffer
     if (*pidBuffer == pid)
     {
-#pragma omp parallel for // Se rifa que lo quite, parece que empeora el tiempo de ejecución
+        // Si paralelizamos el for con openmp, la ejecución resulta ser más lenta, hasta 2 segundos con
+        // el fichero datos_10X. No renta.
         for (int j = 0; j < cols; j++)
         {
             rowDataBuffer[j] = m[rowToSearchIndex * cols + j];
@@ -423,6 +424,9 @@ float euclideanDistance(float *v1, float *v2, int size)
 {
 
     float d = 0.0f;
+
+    // Paralelizar éste for ha resultado en una ejecución casi 10 veces más lenta,
+    // por lo que no renta.
     for (size_t i = 0; i < size; i++)
     {
         float diff = v1[i] - v2[i];
