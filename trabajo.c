@@ -350,20 +350,27 @@ float calculateMAPE(float *vPredict, float *vReal, int size)
 
 void searchRow(int pid, int prn, int wantedRowIndex, int splitRows, int cols, float *localM, float *restM, float *rowDataBuffer, int *pidBuffer)
 {
+    // Calculamos qué proceso debería tener la fila originalmente
     *pidBuffer = wantedRowIndex / splitRows;
-    int rowToSearchIndex = wantedRowIndex % splitRows;
-    float *m = localM;
+    int rowToSearchIndex;
+    float *m;
 
-    // El pid no puede ser igual ni mayor que prn.
-    // Si se da aquí el caso, significa que la línea
-    // a buscar está en las lineas de resto.
-    if (*pidBuffer == prn)
+    // Si el PID calculado es igual o mayor al número de procesos,
+    // significa que la fila está en el resto
+    if (*pidBuffer >= prn)
     {
         *pidBuffer = 0;
         m = restM;
+        // Ajustamos el índice, que sería posición absoluta menos las filas ya repartidas
         rowToSearchIndex = wantedRowIndex - (prn * splitRows);
     }
+    else
+    {
+        m = localM;
+        rowToSearchIndex = wantedRowIndex % splitRows;
+    }
 
+    // El proceso que tiene los datos los copia al buffer
     if (*pidBuffer == pid)
     {
         for (int j = 0; j < cols; j++)
