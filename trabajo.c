@@ -70,10 +70,6 @@ int main(int argc, char *argv[])
     int *bests;
     int *localBests;
     // -- Archivos de salida
-    char outputFolder[] = "output/";
-    char prediccionesFileName[] = "Predicciones.txt";
-    char mapeFileName[] = "MAPE.txt";
-    char tiempoFileName[] = "Tiempo.txt";
     FILE *fPred = NULL, *fMape = NULL, *fTiempo = NULL;
     // --- Variable auxiliar
     char fileName[FILENAME_BUFFER];
