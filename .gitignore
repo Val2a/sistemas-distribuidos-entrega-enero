@@ -8,6 +8,9 @@
 *.elf
 *.bin
 
+# Binary files
+*.bin
+
 # Linker output
 *.ilk
 *.map
