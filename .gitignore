@@ -60,3 +60,8 @@ dkms.conf
 
 # Enunciado
 *enunciado.pdf*
+
+# Output del programa
+*MAPE.txt
+*Predicciones.txt
+*Tiempo.txt

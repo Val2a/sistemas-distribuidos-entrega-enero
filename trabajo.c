@@ -46,15 +46,15 @@ int main(int argc, char *argv[])
     MPI_Offset offset;
     MPI_File fh;
     int rows, cols;
+
     // - Programa
     int splitRows, restRows;
-    // -- Datos del día más actual
 
+    // -- Datos del día más actual
     // --- Línea objetivo (la que se pretende predecir)
     int targetRow;
     // --- Datos de la línea objetivo
     float *targetRowData;
-
     // --- Línea de referencia (la que se usará para buscar vecinos)
     int referenceRow;
     // --- Datos de la línea de referencia
@@ -74,8 +74,11 @@ int main(int argc, char *argv[])
     char prediccionesFileName[] = "Predicciones.txt";
     char mapeFileName[] = "MAPE.txt";
     char tiempoFileName[] = "Tiempo.txt";
+    FILE *fPred = NULL, *fMape = NULL, *fTiempo = NULL;
     // --- Variable auxiliar
     char fileName[FILENAME_BUFFER];
+    // -- Tiempos
+    double t_inicio, t_fin;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &pid);
@@ -132,12 +135,20 @@ int main(int argc, char *argv[])
     MPI_File_read_at_all(fh, offset, localMatrix, splitRows * cols, MPI_FLOAT, 0);
     printf("[PID: %d] Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, localMatrix[0], localMatrix[splitRows * cols - 1]);
 
-    if (pid == 0 && restRows > 0)
+    if (pid == 0)
     {
-        restMatrix = (float *)malloc(restRows * cols * sizeof(float));
-        offset = 8 + (rows - restRows) * cols * sizeof(float);
-        MPI_File_read_at(fh, offset, restMatrix, restRows * cols, MPI_FLOAT, 0);
-        printf("[PID: %d] RESTO: Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, restMatrix[0], restMatrix[restRows * cols - 1]);
+        // Preparamos los archivos de salida
+        fPred = fopen("Predicciones.txt", "w");
+        fMape = fopen("MAPE.txt", "w");
+        t_inicio = MPI_Wtime();
+
+        if (restRows > 0)
+        {
+            restMatrix = (float *)malloc(restRows * cols * sizeof(float));
+            offset = 8 + (rows - restRows) * cols * sizeof(float);
+            MPI_File_read_at(fh, offset, restMatrix, restRows * cols, MPI_FLOAT, 0);
+            printf("[PID: %d] RESTO: Offset: %lld, primer float: %0.1f, ultimo float: %0.1f\n", pid, offset, restMatrix[0], restMatrix[restRows * cols - 1]);
+        }
     }
 
     // Tenemos que realizar las N_PREDICTIONS predicciones.
@@ -286,16 +297,41 @@ int main(int argc, char *argv[])
                 printf("[PID: 0] Predicción [%d] OK. MAPE: %.2f%%\n", i, error); // Mostramos una predicción cada 100 líneas para no sobrecargar la consola.
             }
             sumaMAPE += error;
+
+            // Escribimos las 24 predicciones en una línea
+            for (int j = 0; j < cols; j++)
+            {
+                fprintf(fPred, "%.1f%s", prediction[j], (j == cols - 1) ? "" : ",");
+            }
+            fprintf(fPred, "\n");
+
             free(allCosts); // Liberamos el array de costes global en el PID 0
+            // Escribimos el MAPE de la prediccion
+            fprintf(fMape, "%.4f\n", error);
         }
 
-        // Limpieza de memoria por cada iteración del bucle i
+        // Limpiamos en cada iteración
         free(realData);
         free(prediction);
     }
 
     if (pid == 0)
     {
+        t_fin = MPI_Wtime(); // Fin del cronómetro
+
+        // Generamos Tiempo.txt
+        fTiempo = fopen("Tiempo.txt", "w");
+        fprintf(fTiempo, "Fichero procesado: %s\n", dataPath);
+        fprintf(fTiempo, "Tiempo total: %.4f segundos\n", t_fin - t_inicio);
+        fprintf(fTiempo, "MAPE global: %.4f%%\n", sumaMAPE / N_PREDICTIONS);
+        fprintf(fTiempo, "Configuración: %d procesos, %d hilos\n", prn, numThreads);
+
+        // Liberamos memoria
+
+        fclose(fPred);
+        fclose(fMape);
+        fclose(fTiempo);
+
         printf("\n--------------------------------------------\n");
         printf("FINALIZADO: %s\n", dataPath);
         printf("MAPE PROMEDIO TOTAL: %.4f%%\n", sumaMAPE / N_PREDICTIONS);
@@ -335,6 +371,8 @@ float calculateMAPE(float *vPredict, float *vReal, int size)
 {
     float sum = 0.0;
     int count = 0;
+
+#pragma omp parrallel for reduction(+ : sum) reduction(+ : count) // Falta comprobar que no empeore el resultado
     for (int i = 0; i < size; i++)
     {
         // Solo calculamos si el valor real no es cero para evitar inf/nan
@@ -373,6 +411,7 @@ void searchRow(int pid, int prn, int wantedRowIndex, int splitRows, int cols, fl
     // El proceso que tiene los datos los copia al buffer
     if (*pidBuffer == pid)
     {
+#pragma omp parallel for // Se rifa que lo quite, parece que empeora el tiempo de ejecución
         for (int j = 0; j < cols; j++)
         {
             rowDataBuffer[j] = m[rowToSearchIndex * cols + j];
