@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
     int k;
     char *dataPath;
     int numThreads;
+    float sumaMAPE = 0;
     // - MPI
     int pid, prn;
     // - Archivo
@@ -165,6 +166,140 @@ int main(int argc, char *argv[])
         }
 
         // MPI_Bcast(targetRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
+
+        // Bcast para realizar la distancia euclídea de cada fila local contra la de referencia
+        MPI_Bcast(referenceRowData, cols, MPI_FLOAT, pidWithTheRow, MPI_COMM_WORLD);
+
+// Calculamos la distancia de cada fila local con OpenMP
+#pragma omp parallel for shared(localCosts, referenceRowData, localMatrix, splitRows, cols, referenceRowIndex, pid) schedule(static)
+        for (int i = 0; i < splitRows; i++)
+        {
+            int globalId = pid * splitRows + i;
+            // Solo comparamos con filas pasadas
+            if (globalId < referenceRowIndex)
+            {
+                localCosts[i] = euclideanDistance(referenceRowData, &localMatrix[i * cols], cols);
+            }
+            else
+            {
+                localCosts[i] = __FLT_MAX__; // Ignoramos filas futuras
+            }
+        }
+
+        // Ahora vamos con la recolección de resultados
+
+        float *allCosts = NULL;
+        if (pid == 0)
+        {
+            allCosts = (float *)malloc(rows * sizeof(float));
+        }
+        // Recogemos en el PID 0 todos los costes calculados
+        MPI_Gather(localCosts, splitRows, MPI_FLOAT, allCosts, splitRows, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+        // Inicializamos el vector de predicciones a 0
+        float *prediction = (float *)malloc(cols * sizeof(float));
+        for (int j = 0; j < cols; j++)
+        {
+            prediction[j] = 0.0f;
+        }
+
+        // Gestión del resto
+        if (pid == 0 && restRows > 0)
+        {
+            for (int r = 0; r < restRows; r++)
+            {
+                int globalId = (rows - restRows) + r;
+                if (globalId < referenceRowIndex)
+                {
+                    allCosts[globalId] = euclideanDistance(referenceRowData, &restMatrix[r * cols], cols);
+                }
+                else
+                {
+                    allCosts[globalId] = __FLT_MAX__;
+                }
+            }
+        }
+
+        // BÚSQUEDA DE K VECINOS
+        for (int n = 0; n < k; n++)
+        {
+            int bestId = -1;
+
+            // Solo el PID 0 busca quién es el mejor en su array global de costes
+            if (pid == 0)
+            {
+                float min = __FLT_MAX__;
+                for (int j = 0; j < rows; j++)
+                {
+                    if (allCosts[j] < min)
+                    {
+                        min = allCosts[j];
+                        bestId = j;
+                    }
+                }
+                allCosts[bestId] = __FLT_MAX__; // Marcamos para no repetir vecino
+            }
+
+            // El PID 0 comunica a todos qué ID de vecino ha elegido
+            MPI_Bcast(&bestId, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+            // Todos preparan el buffer para recibir al sucesor
+            float *sucessorData = (float *)malloc(cols * sizeof(float));
+            int pidSuccessorOwner;
+            int successorId = bestId + 1;
+
+            // Cada proceso busca si tiene el sucesor en su memoria local
+            searchRow(pid, prn, successorId, splitRows, cols, localMatrix, restMatrix, sucessorData, &pidSuccessorOwner);
+
+            MPI_Bcast(sucessorData, cols, MPI_FLOAT, pidSuccessorOwner, MPI_COMM_WORLD);
+
+            if (pid == 0)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    prediction[j] += sucessorData[j];
+                }
+            }
+            free(sucessorData);
+        }
+
+        // CÁLCULO DE MAPE Y ERROR
+        if (pid == 0)
+        {
+            for (int j = 0; j < cols; j++)
+                prediction[j] /= (float)k;
+        }
+
+        // Todos buscan quién tiene la fila REAL (Target) para comparar
+        float *realData = (float *)malloc(cols * sizeof(float));
+        int tOwner;
+        searchRow(pid, prn, rows - i, splitRows, cols, localMatrix, restMatrix, realData, &tOwner);
+
+        // Sincronizamos la fila real para que el PID 0 pueda calcular el MAPE
+        MPI_Bcast(realData, cols, MPI_FLOAT, tOwner, MPI_COMM_WORLD);
+
+        if (pid == 0)
+        {
+            float error = calculateMAPE(prediction, realData, cols);
+            if (i % 100 == 0)
+            {
+                printf("[PID: 0] Predicción [%d] OK. MAPE: %.2f%%\n", i, error); // Mostramos una predicción cada 100 líneas para no sobrecargar la consola.
+            }
+            sumaMAPE += error;
+            free(allCosts); // Liberamos el array de costes global en el PID 0
+        }
+
+        // Limpieza de memoria por cada iteración del bucle i
+        free(realData);
+        free(prediction);
+    }
+
+    if (pid == 0)
+    {
+        printf("\n--------------------------------------------\n");
+        printf("FINALIZADO: %s\n", dataPath);
+        printf("MAPE PROMEDIO TOTAL: %.4f%%\n", sumaMAPE / N_PREDICTIONS);
+        printf("--------------------------------------------\n");
     }
 
     // Liberamos la memoria asignada
@@ -199,12 +334,18 @@ int checkArguments(int pid, int argc)
 float calculateMAPE(float *vPredict, float *vReal, int size)
 {
     float sum = 0.0;
+    int count = 0;
     for (int i = 0; i < size; i++)
     {
-        sum += fabsf(vReal[i] - vPredict[i]) / fabsf(vReal[i]);
+        // Solo calculamos si el valor real no es cero para evitar inf/nan
+        if (fabsf(vReal[i]) > 0.0001f)
+        {
+            sum += fabsf(vReal[i] - vPredict[i]) / fabsf(vReal[i]);
+            count++;
+        }
     }
 
-    return (sum * 100.0f) / (float)size;
+    return (count == 0) ? 0.0f : (sum * 100.0f) / (float)count;
 }
 
 void searchRow(int pid, int prn, int wantedRowIndex, int splitRows, int cols, float *localM, float *restM, float *rowDataBuffer, int *pidBuffer)
@@ -220,6 +361,7 @@ void searchRow(int pid, int prn, int wantedRowIndex, int splitRows, int cols, fl
     {
         *pidBuffer = 0;
         m = restM;
+        rowToSearchIndex = wantedRowIndex - (prn * splitRows);
     }
 
     if (*pidBuffer == pid)
@@ -237,7 +379,8 @@ float euclideanDistance(float *v1, float *v2, int size)
     float d = 0.0f;
     for (size_t i = 0; i < size; i++)
     {
-        d += powf(v1[i] - v2[i], 2);
+        float diff = v1[i] - v2[i];
+        d += diff * diff;
     }
 
     return sqrtf(d);
