@@ -158,7 +158,6 @@ int main(int argc, char *argv[])
     {
         int pidWithTheRow = -1; // Será sobreescrito
         int referenceRowIndex = rows - i - 1;
-        // int targetRowIndex = rows - i;
 
         searchRow(pid, prn, referenceRowIndex, splitRows, cols, localMatrix, restMatrix,
                   referenceRowData, &pidWithTheRow); // Output
